@@ -1,27 +1,27 @@
 -- 1. Age Group Analysis with Transaction Patterns
-WITH customer_age AS (
-    SELECT 
-        CustomerID,
-        DATEDIFF(year, CustomerDOB, CURRENT_DATE) as age,
-        CASE 
-            WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 25 THEN 'Young Adult'
-            WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 40 THEN 'Adult'
-            WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 60 THEN 'Middle Age'
-            ELSE 'Senior'
-        END as age_group
-    FROM Customer_Dimension
-)
-SELECT 
-    ca.age_group,
-    COUNT(DISTINCT t.TransactionID) as total_transactions,
-    AVG(t.TransactionAmount) as avg_transaction_amount,
-    SUM(t.TransactionAmount) as total_amount,
-    COUNT(DISTINCT ca.CustomerID) as unique_customers
-FROM customer_age ca
-JOIN Transaction_Dimension t ON ca.CustomerID = t.CustomerID
-JOIN Dim_Time dt ON t.TransactionDate = dt.Date
-GROUP BY ca.age_group
-ORDER BY total_amount DESC;
+-- WITH customer_age AS (
+--     SELECT 
+--         CustomerID,
+--         DATEDIFF(year, CustomerDOB, CURRENT_DATE) as age,
+--         CASE 
+--             WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 25 THEN 'Young Adult'
+--             WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 40 THEN 'Adult'
+--             WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 60 THEN 'Middle Age'
+--             ELSE 'Senior'
+--         END as age_group
+--     FROM Customer_Dimension
+-- )
+-- SELECT 
+--     ca.age_group,
+--     COUNT(DISTINCT t.TransactionID) as total_transactions,
+--     AVG(t.TransactionAmount) as avg_transaction_amount,
+--     SUM(t.TransactionAmount) as total_amount,
+--     COUNT(DISTINCT ca.CustomerID) as unique_customers
+-- FROM customer_age ca
+-- JOIN Transaction_Dimension t ON ca.CustomerID = t.CustomerID
+-- JOIN Dim_Time dt ON t.TransactionDate = dt.Date
+-- GROUP BY ca.age_group
+-- ORDER BY total_amount DESC;
 
 -- 2. Gender-based Transaction Analysis by Quarter
 SELECT 
@@ -50,7 +50,7 @@ FROM Customer_Dimension cd
 JOIN Transaction_Dimension td ON cd.CustomerID = td.CustomerID
 GROUP BY cd.CustLocation, EXTRACT(HOUR FROM td.TransactionTime)
 ORDER BY cd.CustLocation, hour_of_day;
-
+ 
 -- 4. Account Balance vs Transaction Analysis
 WITH customer_transaction_stats AS (
     SELECT 

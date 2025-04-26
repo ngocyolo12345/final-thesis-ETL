@@ -7,8 +7,8 @@ Original file is located at
     https://colab.research.google.com/drive/1O6w72Zb7fRq1RCkyHM-Rmri2_3X8kbpp
 """
 
-!pip install mysql-connector-python sqlalchemy
-!pip install sqlalchemy
+# !pip install mysql-connector-python sqlalchemy
+# !pip install sqlalchemy
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,6 +16,8 @@ import seaborn as sns
 from datetime import datetime
 import mysql.connector
 from sqlalchemy import create_engine
+import mysql.connector
+from mysql.connector import Error
 
 # Load dataset
 df = pd.read_csv('/content/bank_transactions.csv')
@@ -113,33 +115,6 @@ plt.ylabel('Average Transaction Amount', fontsize=14)
 plt.grid()
 plt.show()
 # this step is for Nhat to track the data (end)
-
-customer_dim = df[['CustomerID', 'CustomerDOB', 'CustGender', 'CustLocation', 'CustAccountBalance','Age']]
-
-
-# 2. Create Transaction Dimension
-transaction_dim = df[['TransactionID', 'TransactionDate', 'TransactionTime', 'TransactionAmount (INR)', 'CustomerID']]
-
-# Rename column to match dimension model
-transaction_dim = transaction_dim.rename(columns={'TransactionAmount (INR)': 'TransactionAmount'})
-customer_dim
-
-transaction_dim
-
-# 3. Create Time Dimension
-# Get unique dates from TransactionDate
-unique_dates = pd.DataFrame({'Date': df['TransactionDate'].unique()})
-unique_dates['Date'] = pd.to_datetime(unique_dates['Date'])
-
-# Add time attributes
-unique_dates['Year'] = unique_dates['Date'].dt.year
-unique_dates['Month'] = unique_dates['Date'].dt.month
-unique_dates['MonthName'] = unique_dates['Date'].dt.strftime('%B')
-unique_dates['Quarter'] = unique_dates['Date'].dt.quarter
-
-# Create DateID in format YYYYMMDD as integer
-unique_dates['DateID'] = unique_dates['Date'].dt.strftime('%Y%m%d').astype(int)
-unique_dates
 
 # LOAD DATA
 # database info

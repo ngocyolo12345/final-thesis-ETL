@@ -1,27 +1,27 @@
 -- 1. Age Group Analysis with Transaction Patterns
--- WITH customer_age AS (
---     SELECT 
---         CustomerID,
---         DATEDIFF(year, CustomerDOB, CURRENT_DATE) as age,
---         CASE 
---             WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 25 THEN 'Young Adult'
---             WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 40 THEN 'Adult'
---             WHEN DATEDIFF(year, CustomerDOB, CURRENT_DATE) < 60 THEN 'Middle Age'
---             ELSE 'Senior'
---         END as age_group
---     FROM Customer_Dimension
--- )
--- SELECT 
---     ca.age_group,
---     COUNT(DISTINCT t.TransactionID) as total_transactions,
---     AVG(t.TransactionAmount) as avg_transaction_amount,
---     SUM(t.TransactionAmount) as total_amount,
---     COUNT(DISTINCT ca.CustomerID) as unique_customers
--- FROM customer_age ca
--- JOIN Transaction_Dimension t ON ca.CustomerID = t.CustomerID
--- JOIN Dim_Time dt ON t.TransactionDate = dt.Date
--- GROUP BY ca.age_group
--- ORDER BY total_amount DESC;
+WITH customer_age AS (
+    SELECT 
+        CustomerID,
+        Age,
+        CASE 
+            WHEN Age < 25 THEN 'Young Adult'
+            WHEN Age < 40 THEN 'Adult'
+            WHEN Age < 60 THEN 'Middle Age'
+            ELSE 'Senior'
+        END as age_group
+    FROM DimCustomer
+)
+SELECT 
+    ca.age_group,
+    COUNT(DISTINCT t.TransactionID) as total_transactions,
+    AVG(t.TransactionAmount) as avg_transaction_amount,
+    SUM(t.TransactionAmount) as total_amount,
+    COUNT(DISTINCT ca.CustomerID) as unique_customers
+FROM customer_age ca
+JOIN DimTransaction t ON ca.CustomerID = t.CustomerID
+JOIN DimTime dt ON t.TransactionDate = dt.Date
+GROUP BY ca.age_group
+ORDER BY total_amount DESC;
 
 -- 2. Gender-based Transaction Analysis by Quarter
 SELECT 
@@ -33,9 +33,9 @@ SELECT
     SUM(td.TransactionAmount) as total_amount,
     MAX(td.TransactionAmount) as highest_transaction,
     MIN(td.TransactionAmount) as lowest_transaction
-FROM Customer_Dimension cd
-JOIN Transaction_Dimension td ON cd.CustomerID = td.CustomerID
-JOIN Dim_Time dt ON td.TransactionDate = dt.Date
+FROM DimCustomer cd
+JOIN DimTransaction td ON cd.CustomerID = td.CustomerID
+JOIN DimTime dt ON td.TransactionDate = dt.Date
 GROUP BY dt.Year, dt.Quarter, cd.CustGender
 ORDER BY dt.Year, dt.Quarter;
 
@@ -46,11 +46,11 @@ SELECT
     COUNT(*) as transaction_count,
     AVG(td.TransactionAmount) as avg_amount,
     SUM(td.TransactionAmount) as total_amount
-FROM Customer_Dimension cd
-JOIN Transaction_Dimension td ON cd.CustomerID = td.CustomerID
+FROM DimCustomer cd
+JOIN DimTransaction td ON cd.CustomerID = td.CustomerID
 GROUP BY cd.CustLocation, EXTRACT(HOUR FROM td.TransactionTime)
 ORDER BY cd.CustLocation, hour_of_day;
- 
+
 -- 4. Account Balance vs Transaction Analysis
 WITH customer_transaction_stats AS (
     SELECT 
@@ -59,8 +59,8 @@ WITH customer_transaction_stats AS (
         COUNT(td.TransactionID) as transaction_count,
         AVG(td.TransactionAmount) as avg_transaction_amount,
         SUM(td.TransactionAmount) as total_spent
-    FROM Customer_Dimension cd
-    LEFT JOIN Transaction_Dimension td ON cd.CustomerID = td.CustomerID
+    FROM DimCustomer cd
+    LEFT JOIN DimTransaction td ON cd.CustomerID = td.CustomerID
     GROUP BY cd.CustomerID, cd.CustAccountBalance
 )
 SELECT 
@@ -82,50 +82,66 @@ GROUP BY CASE
     ELSE 'Very High Balance'
 END;
 
--- 5. Monthly Transaction Trends by Customer Demographics
+-- 5. Monthly Transaction top 3 Trends by Customer Demographics
+WITH RankedTransactions AS (
+    SELECT 
+        dt.Month,
+        cd.CustLocation,
+        COUNT(td.TransactionID) AS transaction_count,
+        SUM(td.TransactionAmount) AS total_amount,
+        AVG(td.TransactionAmount) AS avg_transaction_value,
+        ROW_NUMBER() OVER (PARTITION BY dt.Month ORDER BY SUM(td.TransactionAmount) DESC) AS ranking
+    FROM 
+        DimTransaction td
+    JOIN 
+        DimCustomer cd ON td.CustomerID = cd.CustomerID
+    JOIN 
+        DimTime dt ON td.TransactionDate = dt.Date
+    GROUP BY 
+        cd.CustLocation, dt.Month
+)
 SELECT 
-    dt.Year,
-    dt.Month,
-    cd.CustGender,
-    cd.CustLocation,
-    COUNT(td.TransactionID) as transaction_count,
-    SUM(td.TransactionAmount) as total_amount,
-    AVG(td.TransactionAmount) as avg_transaction_value
-FROM Transaction_Dimension td
-JOIN Customer_Dimension cd ON td.CustomerID = cd.CustomerID
-JOIN Dim_Time dt ON td.TransactionDate = dt.Date
-GROUP BY dt.Year, dt.Month, cd.CustGender, cd.CustLocation
-ORDER BY dt.Year, dt.Month;
+    Month,
+    CustLocation,
+    transaction_count,
+    total_amount,
+    avg_transaction_value
+FROM 
+    RankedTransactions
+WHERE 
+    ranking <= 3
+ORDER BY 
+    Month, ranking;
 
 -- 6. Customer Age and Transaction Time Analysis
 SELECT 
     CASE 
-        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 6 AND 11 THEN 'Morning'
-        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 12 AND 16 THEN 'Afternoon'
-        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 17 AND 21 THEN 'Evening'
+        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 60000 AND 110000 THEN 'Morning'
+        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 120000 AND 160000 THEN 'Afternoon'
+        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 170000 AND 210000 THEN 'Evening'
         ELSE 'Night'
     END as time_of_day,
     CASE 
-        WHEN DATEDIFF(year, cd.CustomerDOB, CURRENT_DATE) < 25 THEN 'Young Adult'
-        WHEN DATEDIFF(year, cd.CustomerDOB, CURRENT_DATE) < 40 THEN 'Adult'
-        WHEN DATEDIFF(year, cd.CustomerDOB, CURRENT_DATE) < 60 THEN 'Middle Age'
+        WHEN Age < 25 THEN 'Young Adult'
+        WHEN Age < 40 THEN 'Adult'
+        WHEN Age < 60 THEN 'Middle Age'
         ELSE 'Senior'
     END as age_group,
     COUNT(*) as transaction_count,
     AVG(td.TransactionAmount) as avg_amount
-FROM Transaction_Dimension td
-JOIN Customer_Dimension cd ON td.CustomerID = cd.CustomerID
+FROM DimTransaction td
+JOIN DimCustomer cd ON td.CustomerID = cd.CustomerID
 GROUP BY 
     CASE 
-        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 6 AND 11 THEN 'Morning'
-        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 12 AND 16 THEN 'Afternoon'
-        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 17 AND 21 THEN 'Evening'
+        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 60000 AND 110000 THEN 'Morning'
+        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 120000 AND 160000 THEN 'Afternoon'
+        WHEN EXTRACT(HOUR FROM td.TransactionTime) BETWEEN 170000 AND 210000 THEN 'Evening'
         ELSE 'Night'
     END,
     CASE 
-        WHEN DATEDIFF(year, cd.CustomerDOB, CURRENT_DATE) < 25 THEN 'Young Adult'
-        WHEN DATEDIFF(year, cd.CustomerDOB, CURRENT_DATE) < 40 THEN 'Adult'
-        WHEN DATEDIFF(year, cd.CustomerDOB, CURRENT_DATE) < 60 THEN 'Middle Age'
+        WHEN Age < 25 THEN 'Young Adult'
+        WHEN Age < 40 THEN 'Adult'
+        WHEN Age < 60 THEN 'Middle Age'
         ELSE 'Senior'
     END;
 
@@ -139,8 +155,8 @@ WITH transaction_frequency AS (
         SUM(td.TransactionAmount) as total_amount,
         MAX(td.TransactionDate) as last_transaction_date,
         MIN(td.TransactionDate) as first_transaction_date
-    FROM Customer_Dimension cd
-    LEFT JOIN Transaction_Dimension td ON cd.CustomerID = td.CustomerID
+    FROM DimCustomer cd
+    LEFT JOIN DimTransaction td ON cd.CustomerID = td.CustomerID
     GROUP BY cd.CustomerID, cd.CustGender, cd.CustLocation
 )
 SELECT 
@@ -170,8 +186,8 @@ WITH quarterly_transactions AS (
         dt.Quarter,
         COUNT(td.TransactionID) as transaction_count,
         SUM(td.TransactionAmount) as total_amount
-    FROM Transaction_Dimension td
-    JOIN Dim_Time dt ON td.TransactionDate = dt.Date
+    FROM DimTransaction td
+    JOIN DimTime dt ON td.TransactionDate = dt.Date
     GROUP BY dt.Year, dt.Quarter
 )
 SELECT 
@@ -184,3 +200,5 @@ SELECT
      LAG(total_amount) OVER (ORDER BY Year, Quarter)) * 100 as quarter_over_quarter_growth
 FROM quarterly_transactions
 ORDER BY Year, Quarter;
+
+select * from dimtime;	

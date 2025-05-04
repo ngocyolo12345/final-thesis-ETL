@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import numpy as np
 
 # Load dataset
 df = pd.read_csv('bank_transactions.csv')
@@ -27,10 +28,9 @@ df.drop_duplicates(inplace = True)
 # Drop null
 df = df.dropna().reset_index(drop=True)
 
-#check after
-df.isnull().sum()
-
-df.describe(exclude=[int,float])
+# drop different gender
+df['CustGender'].value_counts()
+df.drop(df[df['CustGender']=='T'].index,inplace=True)
 
 # Feature Engineering: Extract age
 # def convert_date(date_str):
@@ -66,6 +66,21 @@ df = df[df['CustomerDOB'].dt.year <= (df['TransactionDate'].dt.year - 18)]
 
 # # Calculate age
 df['Age'] = df['TransactionDate'].dt.year - df['CustomerDOB'].dt.year
+
+# get the column for outliners checking
+outliners = ['CustAccountBalance', 'TransactionAmount (INR)', 'Age']
+
+# Remove outliers using IQR
+for column in outliners:
+    Q1 = df[column].quantile(0.25)  # 25th percentile
+    Q3 = df[column].quantile(0.75)  # 75th percentile
+    IQR = Q3 - Q1  # Interquartile range
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    # Filter the dataset to remove outliers
+    df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+print(df.describe())
 
 # LOAD DATA
 # database info

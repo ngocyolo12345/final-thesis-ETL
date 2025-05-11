@@ -30,7 +30,16 @@ df = df.dropna().reset_index(drop=True)
 
 # drop different gender
 df['CustGender'].value_counts()
-df.drop(df[df['CustGender']=='T'].index,inplace=True)
+df = df[df['CustGender'].isin(['M', 'F'])]
+
+# # Group by CustomerID and get the most common location and DOB
+# mode_df = df.groupby('CustomerID').agg({
+#     'CustLocation': lambda x: x.mode()[0] if not x.mode().empty else None,
+#     'CustomerDOB': lambda x: x.mode()[0] if not x.mode().empty else None
+# }).reset_index()
+
+# # Merge back with original data (keeping other columns)
+# df = df.drop(['CustLocation', 'CustomerDOB'], axis=1).merge(mode_df, on='CustomerID')
 
 # Feature Engineering: Extract age
 # def convert_date(date_str):
@@ -39,10 +48,15 @@ df.drop(df[df['CustGender']=='T'].index,inplace=True)
 
 # format date time for CustomerDOB and TransactionDate
 df['CustomerDOB'] = pd.to_datetime(df['CustomerDOB'])
-df['TransactionDate'] = pd.to_datetime(df['TransactionDate'])
+df['TransactionDate'] = pd.to_datetime(df['TransactionDate'], format='%d/%m/%y', errors='coerce', yearfirst=True)
 
 # show data after change the datetime format
 df
+
+filtered_df = df[df['CustomerID'] == 'C4140741']
+filtered_df
+
+df['TransactionDate'].value_counts()
 
 # Get the current date
 current_date = datetime.now().year
@@ -62,8 +76,6 @@ df = df[df['CustomerDOB'].dt.year >= df['cutoff_date'].dt.year]
 # only get customer over 18 years old
 df = df[df['CustomerDOB'].dt.year <= (df['TransactionDate'].dt.year - 18)]
 
-
-
 # # Calculate age
 df['Age'] = df['TransactionDate'].dt.year - df['CustomerDOB'].dt.year
 
@@ -79,13 +91,26 @@ for column in outliners:
     upper_bound = Q3 + 1.5 * IQR
     # Filter the dataset to remove outliers
     df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-print(df.describe())
+
+# Drop the 'cutoff_date' column
+df = df.drop('cutoff_date', axis=1)
+
+#reset index after cleaning
+df.reset_index(drop=True, inplace=True)
+
+# Sort by transaction date (assuming you have a transaction date column)
+df = df.sort_values(by='TransactionDate', ascending=False)
+
+# Keep the first occurrence (most recent) for each customer
+df = df.drop_duplicates(subset=['CustomerID'], keep='first')
+
+# df['CustLocation'] = df.groupby('CustomerID')['CustLocation'].transform(lambda x: x.mode()[0] if not x.mode().empty else x)
+# df['CustomerDOB'] = df.groupby('CustomerID')['CustomerDOB'].transform(lambda x: x.mode()[0] if not x.mode().empty else x)
 
 # LOAD DATA
 # database info
 db_host = "localhost"
-db_name = "thesis"
+db_name = "new_code"
 db_user = "root"
 db_pass = "root123"
 
@@ -103,8 +128,9 @@ df.to_sql('bank_transactions', engine, if_exists='append', index=False,
 print(f"Successfully inserted {len(df)} records into the database")
 
 # 1. Create Customer Dimension
-customer_dim = df[['CustomerID', 'CustomerDOB', 'CustGender', 'CustLocation', 'CustAccountBalance','Age']]
-
+customer_dim = df[['CustomerID', 'Age', 'CustGender', 'CustLocation', 'CustAccountBalance']]
+# remove duplicate for customer ID
+customer_dim = customer_dim.drop_duplicates(subset=['CustomerID'], keep='first')
 # Load Customer Dimension to MySQL
 customer_dim.to_sql('dimcustomer', con=engine, if_exists='replace', index=False)
 

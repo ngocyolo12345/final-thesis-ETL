@@ -109,7 +109,7 @@ SELECT
 FROM 
     RankedTransactions
 WHERE 
-    ranking <= 3
+    ranking <= 10
 ORDER BY 
     Month, ranking;
 

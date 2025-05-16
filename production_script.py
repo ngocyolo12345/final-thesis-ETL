@@ -15,7 +15,9 @@ df
 #checking data
 df.info()
 df.head()
-
+# format data type for TransactionAmount and 
+df['TransactionAmount (INR)'] = df['TransactionAmount (INR)'].astype(float)
+df['CustAccountBalance'] = df['CustAccountBalance'].astype(float)
 #checking data
 df.describe(exclude=[int,float])
 
